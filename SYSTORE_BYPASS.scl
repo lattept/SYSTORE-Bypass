@@ -1,0 +1,364 @@
+﻿FUNCTION_BLOCK "SYSTORE_BYPASS"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+// =============================================================================
+// FB_SYS_BYPASS
+// =============================================================================
+// Description:
+//   State machine for SYSTORE bypass mode on a conveyor zone 1 and zone 5.
+//   When SYSTORE communication fails and operator enables bypass via keyswitch
+//   and hold-to-start, the PLC takes over automatic pallet movement.
+//
+// Author: piyabud
+// Date: 2026-01-27
+// Target: Siemens S7-1200/1500 (TIA Portal)
+//
+// Exit Policy:
+//   - When operator presses the STOP button on cabinet
+//   - When operator turns keyswitch OFF
+//   - When SYSTORE communication returns
+// =============================================================================
+// =============================================================================
+// CONSTANTS - State Definitions
+// =============================================================================
+   VAR_INPUT 
+      Enable : Bool := TRUE;   // FB enable (from PLC run status)
+      BypassKeySW : Bool;
+      BypassStartPB : Bool;   // Push button: Start bypass (hold-to-start)
+      BypassStopPB : Bool;   // Push button: Stop bypass (optional)
+      SYS_HeartbeatHi : Word;   // SYSTORE heartbeat counter - High word (MSB)
+      SYS_HeartbeatLo : Word;   // SYSTORE heartbeat counter - Low word (LSB)
+      SafetyOK : Bool := TRUE;   // Safety system OK (TRUE = safe)
+      PendantAuto : Bool;   // Pendant mode: TRUE=Auto, FALSE=Manual
+   END_VAR
+
+   VAR_OUTPUT 
+      BypassActive : Bool;   // Bypass mode is active
+      CommOK : Bool;   // SYSTORE communication is healthy
+      StateName : String[32];   // Current state name (for HMI)
+      FaultCode : Int;   // Fault code (0 = no fault)
+      FaultMessage : String[64];   // Fault description
+   END_VAR
+
+   VAR 
+      State : Int := 0;   // Current state
+      PrevState : Int := 0;   // Previous state (for edge detection)
+      StateChanged : Bool;   // State transition occurred this scan Heartbeat monitoring (2-word counter) HB_Counter      : DInt;             // Combined 32-bit heartbeat counter HB_LastCounter  : DInt;             // Last scan's counter value
+      HB_Counter : Word;   // 16-bit heartbeat counter
+      HB_LastCounter : Word;   // Last scan's counter value
+      HB_Changed : Bool;   // Counter changed since last scan Timers
+      InitDone : Bool;   // Initialization complete
+      LineReady : Bool;   // Line is ready for bypass operation
+      StopRequested : Bool;   // Stop was requested
+      VARs : Struct
+         mEdge : Byte;
+         FP_Start : Bool;
+         FN_Switch : Bool;
+         Init_PathMNG : Bool;
+         Fault_PathMNG : Bool;
+      END_STRUCT;
+      CFG : Struct
+         T_CommTimeout : Time := T#5S;   // Comm lost after 3 seconds no heartbeat
+         T_InitDelay : Time := T#5S;   // Initialization delay Internal flags
+         T_HoldStart : Time := T#5S;
+         T_MotorTimeout : Time := T#6S;
+      END_STRUCT;
+      "Timer" : Struct
+         tComm {InstructionName := 'TON_TIME'; LibVersion := '1.0'} : TON_TIME;   // Communication timeout timer
+         tInitDelay {InstructionName := 'TON_TIME'; LibVersion := '1.0'} : TON_TIME;   // Initialization delay timer Timer presets
+         tHoldStart {InstructionName := 'TON_TIME'; LibVersion := '1.0'} : TON_TIME;
+         tMotorTimeout {InstructionName := 'TON_TIME'; LibVersion := '1.0'} : Array[0..31] of TON_TIME;
+      END_STRUCT;
+   END_VAR
+
+   VAR_TEMP 
+      inBypassState : Bool;   // Currently in any bypass state
+   END_VAR
+
+   VAR CONSTANT 
+      ST_OFF : Int := 0;   // Idle / FB not active
+      ST_SYSTORE : Int := 10;   // Normal SYSTORE mode - PLC is passive
+      ST_SYSTORE_CHECK : Int := 20;   // Keyswitch ON, waiting for hold-to-start
+      ST_BYPASS_INIT : Int := 30;   // Initialize bypass, reset flags
+      ST_BYPASS_MOVECHECK : Int := 40;   // Check conveyor line readiness
+      ST_BYPASS_OPERATION : Int := 50;   // Main bypass auto operation
+      ST_BYPASS_EXIT : Int := 60;   // Safe stop and cleanup
+   END_VAR
+
+
+BEGIN
+	REGION Description
+	    //
+	END_REGION
+	
+	REGION 0 - EDGE SIGNAL MANAGEMENT
+	    // Negative edge of key switch
+	    #VARs.FN_Switch := NOT #BypassKeySW AND #VARs.mEdge.%X0;
+	    #VARs.mEdge.%X0 := #BypassKeySW;
+	    
+	    // Transition: BypassStartPB = ON -> SYSTORE_CHECK [Positive edge]
+	    #VARs.FP_Start := #Timer.tHoldStart.Q AND NOT #VARs.mEdge.%X1;
+	    #VARs.mEdge.%X1 := #Timer.tHoldStart.Q;
+	END_REGION
+	
+	
+	// =============================================================================
+	REGION 1 - HEARTBEAT MONITORING
+	// =============================================================================
+	    // SYSTORE sends a counter that continuously increments while communication is active
+	    #HB_Counter := #SYS_HeartbeatLo; // Use only low word
+	    #HB_Changed := (#HB_Counter <> #HB_LastCounter);
+	    #HB_LastCounter := #HB_Counter;
+	    
+	    // Communication timeout timer
+	    #Timer.tComm(IN := NOT #HB_Changed,
+	                 PT := #CFG.T_CommTimeout);
+	    
+	    // CommOK status logic:
+	    IF #HB_Changed THEN
+	        #CommOK := TRUE;
+	    ELSIF #Timer.tComm.Q THEN
+	        #CommOK := FALSE;
+	    END_IF;
+	    
+	END_REGION
+	
+	// =============================================================================
+	REGION 2 - STATE TRIGGERS
+	// =============================================================================
+	    // Track state changes
+	    #StateChanged := (#State <> #PrevState);
+	    #PrevState := #State;
+	    
+	    // Determine if we're in any bypass state
+	    #inBypassState := (#State >= #ST_BYPASS_INIT) AND (#State <= #ST_BYPASS_EXIT);
+	    #StopRequested := #BypassStopPB OR #VARs.FN_Switch;
+	    
+	END_REGION
+	
+	// =============================================================================
+	REGION 3 - SAFETY OVERRIDE CHECK and STOP REQUEST
+	// =============================================================================
+	    // Safety override - highest pri STATE MACHINE
+	    IF NOT #SafetyOK THEN
+	        IF #inBypassState THEN
+	            #State := #ST_BYPASS_EXIT;
+	        ELSE
+	            #State := #ST_OFF;
+	        END_IF;
+	    END_IF;
+	    
+	    IF #StopRequested THEN
+	        IF #inBypassState THEN
+	            #State := #ST_BYPASS_EXIT;
+	        ELSE
+	            #State := #ST_SYSTORE;
+	        END_IF;
+	    END_IF;
+	END_REGION
+	
+	// =============================================================================
+	REGION 4 - STATE MACHINE
+	// =============================================================================
+	    // NOT #Enable check
+	    IF NOT #Enable THEN
+	        #State := #ST_OFF;
+	    END_IF;
+	
+	    CASE #State OF
+	            // -----------------------------------------------------------------
+	            // ST_OFF: Idle state - FB is not active
+	            // -----------------------------------------------------------------
+	        #ST_OFF:
+	            #StateName := 'OFF';
+	            #BypassActive := FALSE;
+	            
+	            // Transition: Enable -> SYSTORE
+	            IF NOT #Enable THEN
+	                RETURN;
+	            END_IF;
+	            
+	            #State := #ST_SYSTORE;
+	            
+	            // -----------------------------------------------------------------
+	            // ST_SYSTORE: Normal WMS mode - PLC is passive
+	            // -----------------------------------------------------------------
+	        #ST_SYSTORE:
+	            #StateName := 'SYSTORE';
+	            #BypassActive := FALSE;
+	            
+	            IF #VARs.FP_Start THEN
+	                #State := #ST_SYSTORE_CHECK;
+	            END_IF;
+	            
+	            // -----------------------------------------------------------------
+	            // ST_SYSTORE_CHECK: Keyswitch ON, waiting for conditions
+	            // -----------------------------------------------------------------
+	        #ST_SYSTORE_CHECK:
+	            #StateName := 'SYSTORE_CHECK';
+	            #BypassActive := FALSE;
+	            
+	            IF #CommOK THEN
+	                #State := #ST_SYSTORE; // Transition: Comm is OK -> back to NORMAL (bypass not needed)
+	            ELSE
+	                #State := #ST_BYPASS_INIT; // Transition: Comm is not OK -> BYPASS_INIT
+	            END_IF;
+	            
+	            // -----------------------------------------------------------------
+	            // ST_BYPASS_INIT: Initialize bypass mode
+	            // -----------------------------------------------------------------
+	        #ST_BYPASS_INIT:
+	            #StateName := 'BYPASS_INIT';
+	            #BypassActive := TRUE;
+	            
+	            // On entry: reset flags
+	            IF #StateChanged THEN
+	                #InitDone := FALSE;
+	                #LineReady := FALSE;
+	            END_IF;
+	            
+	            // -----------------------------------------------------------------
+	            // INITIALIZATION LOGIC PLACEHOLDER
+	            // -----------------------------------------------------------------
+	            // Perform any initialization required:
+	            // - Reset conveyor fault flags
+	            // - Clear pending SYSTORE commands
+	            //
+	            // Example:
+	            // FOR i := 1 TO N_CONV DO
+	            //     ConvFaultReset[i] := TRUE;  // Reset conveyor faults
+	            //     SystoreCmdClear[i] := FALSE;     // Clear SYSTORE commands
+	            // END_FOR;
+	            #FaultMessage := '';
+	            // -----------------------------------------------------------------
+	            
+	            IF #Timer.tInitDelay.Q THEN
+	                #InitDone := TRUE;
+	            END_IF;
+	            
+	            // Transition: Init done -> MOVECHECK
+	            IF #InitDone THEN
+	                #State := #ST_BYPASS_MOVECHECK;
+	            END_IF;
+	            
+	            IF #CommOK THEN
+	                #State := #ST_BYPASS_EXIT;
+	            END_IF;
+	            
+	            // -----------------------------------------------------------------
+	            // ST_BYPASS_MOVECHECK: Check line pallet presence
+	            // -----------------------------------------------------------------
+	        #ST_BYPASS_MOVECHECK:
+	            #StateName := 'BYPASS_MOVECHECK';
+	            #BypassActive := TRUE;
+	            
+	            // On entry
+	            IF #StateChanged THEN
+	                #LineReady := FALSE;
+	            END_IF;
+	            
+	            // -----------------------------------------------------------------
+	            // LINE READINESS CHECK PLACEHOLDER
+	            // -----------------------------------------------------------------
+	            // Check if the conveyor line has pallets
+	            //
+	            // Example:
+	            // FOR i := 1 TO N_CONV DO
+	            //     Move foward 2 conveyors at a time for 2 secs, stop when reach 2 second or pallet is detected
+	            // END_FOR;
+	            // -----------------------------------------------------------------
+	            
+	            // For now, assume line is ready (implement checks above)
+	            #LineReady := TRUE;
+	            
+	            // Transition: Line ready -> OPERATION
+	            IF #LineReady THEN
+	                #State := #ST_BYPASS_OPERATION;
+	            END_IF;
+	            
+	            IF #CommOK THEN
+	                #State := #ST_BYPASS_EXIT;
+	            END_IF;
+	            // -----------------------------------------------------------------
+	            // ST_BYPASS_OPERATION: Main bypass automatic operation
+	            // -----------------------------------------------------------------
+	        #ST_BYPASS_OPERATION:
+	            #StateName := 'BYPASS_OPERATION';
+	            #BypassActive := TRUE;
+	            
+	            #VARs.Init_PathMNG := false;
+	            IF #StateChanged THEN
+	                #VARs.Init_PathMNG := true;
+	            END_IF;
+	            
+	            "PATH_MANAGEMENT_DB"(Init_MNG := #VARs.Init_PathMNG);
+	            
+	            // Transition: CommOK OR StopRequested -> EXIT
+	            IF #CommOK OR "PATH_MANAGEMENT_DB".Fault_Timeout THEN
+	                #FaultMessage := 'Movement timeout from PATH FB';
+	                #State := #ST_BYPASS_EXIT;
+	            END_IF;
+	            
+	            // -----------------------------------------------------------------
+	            // ST_BYPASS_EXIT: Safe stop and cleanup
+	            // -----------------------------------------------------------------
+	        #ST_BYPASS_EXIT:
+	            #StateName := 'BYPASS_EXIT';
+	            #BypassActive := FALSE;
+	            
+	            // -----------------------------------------------------------------
+	            // FINALIZATION LOGIC PLACEHOLDER
+	            // -----------------------------------------------------------------
+	            // Perform safe shutdown:
+	            // - Ensure all motors are stopped
+	            // - Reset any temporary bypass flags
+	            // - Log bypass session end
+	            // - Clear commands
+	            //
+	            // Example:
+	            // AllMotorsStopped := TRUE;
+	            // FOR i := 1 TO N_CONV DO
+	            //     IF MotorRunning[i] THEN
+	            //         AllMotorsStopped := FALSE;
+	            //     END_IF;
+	            // END_FOR;
+	            // IF AllMotorsStopped THENwwww
+	            //     State := ST_SYSTORE;
+	            // END_IF;
+	            // -----------------------------------------------------------------
+	            
+	            // Reset flags
+	            #InitDone := FALSE;
+	            #LineReady := FALSE;
+	            #StopRequested := FALSE;
+	            
+	            // Transition: Return to appropriate state
+	            #State := #ST_SYSTORE;
+	            
+	            // -----------------------------------------------------------------
+	            // Default: Unknown state -> go to OFF
+	            // -----------------------------------------------------------------
+	        ELSE:
+	            #State := #ST_OFF;
+	    END_CASE;
+	END_REGION
+	
+	// =============================================================================
+	REGION 5 - TIMER CALL
+	// =============================================================================
+	    // ST_SYSTORE
+	    IF NOT #BypassStopPB THEN
+	        #Timer.tHoldStart(IN := #BypassKeySW AND #BypassStartPB,
+	                          PT := #CFG.T_HoldStart);
+	    END_IF;
+	    
+	    // ST_BYPASS_INIT
+	    #Timer.tInitDelay(IN := #State = #ST_BYPASS_INIT AND NOT #InitDone,
+	                      PT := #CFG.T_InitDelay);
+	    
+	END_REGION
+	
+	
+	
+END_FUNCTION_BLOCK
+

@@ -1,0 +1,145 @@
+﻿FUNCTION_BLOCK "PATH_MANAGEMENT"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      Init_MNG : Bool;
+   END_VAR
+
+   VAR 
+      Fault_Timeout : Bool;
+   END_VAR
+
+
+BEGIN
+	REGION INIT
+	    IF #Init_MNG THEN
+	        #Fault_Timeout := false;
+	    END_IF;
+	END_REGION
+	
+	REGION  FAULT TRANSFER INPUT
+	    "PATH_E0001->E0003_DB".Fault_Timeout := #Fault_Timeout;
+	    "PATH_E0004->E0003_DB".Fault_Timeout := #Fault_Timeout;
+	    "PATH_E0003->E0006_DB".Fault_Timeout := #Fault_Timeout;
+	    "PATH_E0006->E0008_DB".Fault_Timeout := #Fault_Timeout;
+	    "PATH_E0006->E0007_DB".Fault_Timeout := #Fault_Timeout;
+	END_REGION
+	    
+	    
+	REGION PATH CFG
+	    // PATH configuration for E0001 -> E0003
+	    "PATH_E0001->E0003_DB".CFG.NumberModules := 3;
+	    "PATH_E0001->E0003_DB".CFG.HskDestEna := true;
+	    
+	    "PATH_E0001->E0003_DB".CFG.ModuleList[0] := INT_TO_UINT("DB_MODULE_E0001".CFG.Module_DB);
+	    "PATH_E0001->E0003_DB".CFG.CommandList[0] := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
+	    
+	    "PATH_E0001->E0003_DB".CFG.ModuleList[1] := INT_TO_UINT("DB_MODULE_E0002".CFG.Module_DB);
+	    "PATH_E0001->E0003_DB".CFG.CommandList[1] := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
+	    
+	    "PATH_E0001->E0003_DB".CFG.ModuleList[2] := INT_TO_UINT("DB_MODULE_E0003".CFG.Module_DB);
+	    "PATH_E0001->E0003_DB".CFG.CommandList[2] := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
+	    
+	    
+	    // PATH configuration for E0004 -> E0003
+	    "PATH_E0004->E0003_DB".CFG.NumberModules := 2;
+	    "PATH_E0004->E0003_DB".CFG.HskDestEna := true;
+	    
+	    "PATH_E0004->E0003_DB".CFG.ModuleList[0] := INT_TO_UINT("DB_MODULE_E0004".CFG.Module_DB);
+	    "PATH_E0004->E0003_DB".CFG.CommandList[0] := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
+	    
+	    "PATH_E0004->E0003_DB".CFG.ModuleList[1] := INT_TO_UINT("DB_MODULE_E0003".CFG.Module_DB);
+	    "PATH_E0004->E0003_DB".CFG.CommandList[1] := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
+	
+	    // PATH configuration for E0003 -> E0006
+	    "PATH_E0003->E0006_DB".CFG.NumberModules := 3;
+	    "PATH_E0003->E0006_DB".CFG.ModuleList[0] := INT_TO_UINT("DB_MODULE_E0003".CFG.Module_DB);
+	    "PATH_E0003->E0006_DB".CFG.CommandList[0] := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
+	    
+	    "PATH_E0003->E0006_DB".CFG.ModuleList[1] := INT_TO_UINT("DB_MODULE_E0005".CFG.Module_DB);
+	    "PATH_E0003->E0006_DB".CFG.CommandList[1] := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
+	    
+	    "PATH_E0003->E0006_DB".CFG.ModuleList[2] := INT_TO_UINT("DB_MODULE_E0006".CFG.Module_DB);
+	    "PATH_E0003->E0006_DB".CFG.CommandList[2] := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
+	    
+	    // PATH configuration for E0006 - >E0008
+	    "PATH_E0006->E0008_DB".CFG.NumberModules := 2;
+	    "PATH_E0006->E0008_DB".CFG.T_MotorTimeout := T#30s;
+	    "PATH_E0006->E0008_DB".CFG.HskSrcEna := true;
+	    
+	    "PATH_E0006->E0008_DB".CFG.ModuleList[0] := INT_TO_UINT("DB_MODULE_E0006".CFG.Module_DB);
+	    "PATH_E0006->E0008_DB".CFG.CommandList[0] := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
+	    
+	    "PATH_E0006->E0008_DB".CFG.ModuleList[1] := INT_TO_UINT("DB_MODULE_E0008".CFG.Module_DB);
+	    "PATH_E0006->E0008_DB".CFG.CommandList[1] := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
+	    
+	    // PATH configuration for E0007 - >E0008
+	    "PATH_E0006->E0007_DB".CFG.NumberModules := 2;
+	    "PATH_E0006->E0007_DB".CFG.T_MotorTimeout := T#30s;
+	    "PATH_E0006->E0007_DB".CFG.HskSrcEna := true;
+	    
+	    "PATH_E0006->E0007_DB".CFG.ModuleList[0] := INT_TO_UINT("DB_MODULE_E0006".CFG.Module_DB);
+	    "PATH_E0006->E0007_DB".CFG.CommandList[0] := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
+	    
+	    "PATH_E0006->E0007_DB".CFG.ModuleList[1] := INT_TO_UINT("DB_MODULE_E0007".CFG.Module_DB);
+	    "PATH_E0006->E0007_DB".CFG.CommandList[1] := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
+	END_REGION
+	
+	REGION MERGE CFG
+	    // PATH merge E0003
+	    "PATH_MERGE_E0003_DB".CFG.NumberOfPaths := 2;
+	    "PATH_MERGE_E0003_DB".CFG.DstReady := NOT "DB_MODULE_E0003".STS_MODULE.Presence;
+	    "PATH_MERGE_E0003_DB".CFG.Req[0] := "PATH_E0001->E0003_DB".Hsk.Req_DstMov;
+	    "PATH_MERGE_E0003_DB".CFG.Req[1] := "PATH_E0004->E0003_DB".Hsk.Req_DstMov;
+	    "PATH_MERGE_E0003_DB".CFG.Done[0] := "PATH_E0001->E0003_DB".Hsk.Done_DstMov;
+	    "PATH_MERGE_E0003_DB".CFG.Done[1] := "PATH_E0004->E0003_DB".Hsk.Done_DstMov;
+	    "PATH_E0001->E0003_DB".Hsk.Grant_DstMov := "PATH_MERGE_E0003_DB".Grant[0];
+	    "PATH_E0004->E0003_DB".Hsk.Grant_DstMov := "PATH_MERGE_E0003_DB".Grant[1];
+	    
+	END_REGION
+	
+	REGION SPLIT CFG
+	    // PATH SPLIT E0006
+	    "PATH_SPLIT_E0006_DB".CFG.NumberOfPaths := 2;
+	    "PATH_SPLIT_E0006_DB".CFG.Req[0] := "PATH_E0006->E0008_DB".Hsk.Req_SrcMov;
+	    "PATH_SPLIT_E0006_DB".CFG.Req[1] := "PATH_E0006->E0007_DB".Hsk.Req_SrcMov;
+	    "PATH_SPLIT_E0006_DB".CFG.Done[0] := "PATH_E0006->E0008_DB".Hsk.Done_SrcMov;
+	    "PATH_SPLIT_E0006_DB".CFG.Done[1] := "PATH_E0006->E0007_DB".Hsk.Done_SrcMov;
+	    "PATH_E0006->E0008_DB".Hsk.Grant_SrcMov := "PATH_SPLIT_E0006_DB".Grant[0];
+	    "PATH_E0006->E0007_DB".Hsk.Grant_SrcMov := "PATH_SPLIT_E0006_DB".Grant[1];
+	    
+	END_REGION
+	
+	
+	REGION CALL PATH
+	    //FB_PATH
+	    "PATH_E0001->E0003_DB"(Init_Path := #Init_MNG); 
+	    "PATH_E0004->E0003_DB"(Init_Path := #Init_MNG);
+	    
+	    // FB MERGE
+	    "PATH_MERGE_E0003_DB"(Init_Merge := #Init_MNG); 
+	    
+	    //FB_PATH
+	    "PATH_E0003->E0006_DB"(Init_Path:=#Init_MNG);
+	    
+	    // FB SPLIT
+	    "PATH_SPLIT_E0006_DB"(Init_Split:=#Init_MNG);
+	    
+	    //FB_PATH
+	    "PATH_E0006->E0008_DB"(Init_Path:=#Init_MNG);
+	    "PATH_E0006->E0007_DB"(Init_Path:=#Init_MNG);
+	    
+	END_REGION
+	
+	
+	REGION FAULT TRANSFER OUTPUT
+	    #Fault_Timeout := 
+	    "PATH_E0001->E0003_DB".Fault_Timeout OR
+	    "PATH_E0004->E0003_DB".Fault_Timeout OR
+	    "PATH_E0003->E0006_DB".Fault_Timeout OR
+	    "PATH_E0006->E0008_DB".Fault_Timeout OR
+	    "PATH_E0006->E0007_DB".Fault_Timeout;
+	END_REGION
+	
+END_FUNCTION_BLOCK
+

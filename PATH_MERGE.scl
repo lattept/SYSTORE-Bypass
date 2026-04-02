@@ -1,0 +1,111 @@
+﻿FUNCTION_BLOCK "PATH_MERGE"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      Init_Merge : Bool;
+   END_VAR
+
+   VAR_OUTPUT 
+      Busy : Bool;
+      ActivePath : Int;   // -1=none / 0=path1 / 1=path2 / 2=path3
+   END_VAR
+
+   VAR 
+      LastGranted { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Int;
+      ValidPaths : Int;
+      i : Int;
+      Candidate : Int;
+      Found : Bool;
+      CFG : Struct
+         NumberOfPaths : Int;   // 2 or 3
+         DstReady : Bool;
+         Req : Array[0..2] of Bool;
+         Done : Array[0..2] of Bool;
+      END_STRUCT;
+      Grant : Array[0..2] of Bool;
+   END_VAR
+
+
+BEGIN
+	// --------------------------------------------------
+	// INIT
+	// --------------------------------------------------
+	IF #Init_Merge THEN
+	    FOR #i := 0 TO 2 DO
+	        #Grant[#i] := FALSE;
+	    END_FOR;
+	    
+	    #Busy := FALSE;
+	    #ActivePath := -1;
+	    #LastGranted := -1;
+	    RETURN;
+	END_IF;
+	
+	// --------------------------------------------------
+	// Clamp number of paths
+	// --------------------------------------------------
+	IF #CFG.NumberOfPaths < 2 THEN
+	    #ValidPaths := 2;
+	ELSIF #CFG.NumberOfPaths > 3 THEN
+	    #ValidPaths := 3;
+	ELSE
+	    #ValidPaths := #CFG.NumberOfPaths;
+	END_IF;
+	
+	// --------------------------------------------------
+	// If a path is already active, hold grant until done
+	// --------------------------------------------------
+	IF #Busy THEN
+	    FOR #i := 0 TO 2 DO
+	        #Grant[#i] := FALSE;
+	    END_FOR;
+	    
+	    IF (#ActivePath >= 0) AND (#ActivePath < #ValidPaths) THEN
+	        #Grant[#ActivePath] := TRUE;
+	        
+	        IF #CFG.Done[#ActivePath] THEN
+	            #Grant[#ActivePath] := FALSE;
+	            #Busy := FALSE;
+	            #LastGranted := #ActivePath;
+	            #ActivePath := -1;
+	        END_IF;
+	    ELSE
+	        // Safety fallback
+	        #Busy := FALSE;
+	        #ActivePath := -1;
+	    END_IF;
+	    
+	    RETURN;
+	END_IF;
+	
+	// --------------------------------------------------
+	// No active path: choose next requester by round-robin
+	// --------------------------------------------------
+	FOR #i := 0 TO 2 DO
+	    #Grant[#i] := FALSE;
+	END_FOR;
+	
+	IF NOT #CFG.DstReady THEN
+	    RETURN;
+	END_IF;
+	
+	#Found := FALSE;
+	#Candidate := -1;
+	
+	// Search starting after LastGranted
+	FOR #i := 1 TO #ValidPaths DO
+	    #Candidate := (#LastGranted + #i) MOD #ValidPaths;
+	    
+	    IF #CFG.Req[#Candidate] THEN
+	        #Found := TRUE;
+	        EXIT;
+	    END_IF;
+	END_FOR;
+	
+	IF #Found THEN
+	    #Grant[#Candidate] := TRUE;
+	    #Busy := TRUE;
+	    #ActivePath := #Candidate;
+	END_IF;
+END_FUNCTION_BLOCK
+
