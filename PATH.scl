@@ -22,7 +22,10 @@ VERSION : 0.1
       CFG : Struct
          NumberModules : Int;
          ModuleList : Array[0..31] of UInt;
-         CommandList : Array[0..31] of Word;
+         CommandList : Array[0..31] of Struct
+            CHARGE : Word;
+            DISCHARGE : Word;
+         END_STRUCT;
          HskSrcEna : Bool;   // 1 = Source module will not move until Hsk.Grant_SrcMov = true
          HskDestEna : Bool;   // 1 = Dest module will not move until Hsk.Grant_DstMov = true
          T_MotorTimeout : Time := T#6S;
@@ -218,7 +221,6 @@ BEGIN
 	        
 	        IF (#ControlWord AND SHL(IN := DWORD#1, N := INT_TO_UINT(#VARs.BitIndex))) <> DWORD#0 THEN
 	            #VARs.dbAny.%DBX12.0 := TRUE;
-	            #VARs.dbAny.DBW14 := #CFG.CommandList[#VARs.BitIndex];
 	            #VARs.dbAny.DBW14 := #CFG.CommandList[#VARs.BitIndex];
 	        ELSE
 	            #VARs.dbAny.%DBX12.0 := FALSE;
