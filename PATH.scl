@@ -17,6 +17,10 @@ VERSION : 0.1
          Done_SrcMov : Bool;
          Done_DstMov : Bool;
       END_STRUCT;
+      Busy : Struct
+         SrcModule : Bool;
+         DstModule : Bool;
+      END_STRUCT;
       Fault_Timeout : Bool;
       TransferActive : Array[0..31] of Bool;
       CFG : Struct
@@ -27,7 +31,7 @@ VERSION : 0.1
             DISCHARGE : Word;
          END_STRUCT;
          HskSrcEna : Bool;   // 1 = Source module will not move until Hsk.Grant_SrcMov = true
-         HskDestEna : Bool;   // 1 = Dest module will not move until Hsk.Grant_DstMov = true
+         HskDstEna : Bool;   // 1 = Dest module will not move until Hsk.Grant_DstMov = true
          T_MotorTimeout : Time := T#6S;
       END_STRUCT;
       "Timer" : Struct
@@ -41,6 +45,8 @@ VERSION : 0.1
          ValidMask { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : DWord;
          ReqBit { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
          DestOccupied { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
+         PrevActive : Bool;
+         NextActive : Bool;
          Fault_Exit { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : Bool;
       END_STRUCT;
    END_VAR
@@ -147,7 +153,7 @@ BEGIN
 	        END_IF;
 	        
 	        // Last segment: N-2 -> N-1
-	        IF #CFG.HskDestEna THEN
+	        IF #CFG.HskDstEna THEN
 	            #Hsk.Req_DstMov :=
 	            ((#StatusWord AND SHL(IN := DWORD#1, N := INT_TO_UINT(#VARs.NumberModules - 2))) <> DWORD#0)
 	            AND
@@ -159,56 +165,84 @@ BEGIN
 	    END_IF;
 	    
 	    // --------------------------------------------------
-	    // 3) Build delayed command from transfer state
-	    //    Stop when N+1 detects pallet
-	    //    Alarm if timeout expires first
+	    // (3) Update timers / finish active transfers
 	    // --------------------------------------------------
 	    #ControlWord := DWORD#0;
+	    
 	    FOR #VARs.BitIndex := 0 TO #VARs.NumberModules - 2 DO
+	        #VARs.DestOccupied := (#StatusWord AND SHL(IN := DWORD#1, N := INT_TO_UINT(#VARs.BitIndex + 1))) <> DWORD#0;
 	        
-	        #VARs.ReqBit := (#TransferReq AND SHL(IN := DWORD#1, N := INT_TO_UINT(#VARs.BitIndex))) <> DWORD#0; // Find N that need to run
-	        #VARs.DestOccupied := (#StatusWord AND SHL(IN := DWORD#1, N := INT_TO_UINT(#VARs.BitIndex + 1))) <> DWORD#0; // Find N+1 if it has pallet
+	        #Timer.tMotorTimeout[#VARs.BitIndex](
+	                                             IN := #TransferActive[#VARs.BitIndex],
+	                                             PT := #CFG.T_MotorTimeout
+	        );
 	        
-	        // Start transfer when request appears
-	        IF #VARs.ReqBit AND NOT #TransferActive[#VARs.BitIndex] THEN
-	            #TransferActive[#VARs.BitIndex] := TRUE;
+	        IF #TransferActive[#VARs.BitIndex] AND #VARs.DestOccupied THEN
+	            IF #VARs.BitIndex = 0 THEN
+	                #Hsk.Done_SrcMov := TRUE;
+	            END_IF;
+	            
+	            IF #VARs.BitIndex = (#VARs.NumberModules - 2) THEN
+	                #Hsk.Done_DstMov := TRUE;
+	            END_IF;
+	            
+	            #TransferActive[#VARs.BitIndex] := FALSE;
 	        END_IF;
 	        
-	        // Run timeout timer while transfer is active
-	        #Timer.tMotorTimeout[#VARs.BitIndex](IN := #TransferActive[#VARs.BitIndex],
-	                                        PT := #CFG.T_MotorTimeout);
-	   
-	       // Finish transfer normally: stop immediately when destination sensor is detected
-	       IF #TransferActive[#VARs.BitIndex] AND #VARs.DestOccupied THEN
-	       
-	           // Hsk.Done_SrcMov/Hsk.Done_DstMov update
-	           // (Separate case since if use ELSIF for 2 modules path, it will always hit first condition
-	           IF #VARs.BitIndex = 0 THEN
-	               #Hsk.Done_SrcMov := TRUE;
-	           END_IF;
-	           IF #VARs.BitIndex = (#VARs.NumberModules - 2) THEN
-	               #Hsk.Done_DstMov := TRUE;
-	           END_IF;
-	       
-	           #TransferActive[#VARs.BitIndex] := FALSE;
-	       END_IF;
-	       
-	       // Timeout alarm: destination did not arrive in time
-	       IF #TransferActive[#VARs.BitIndex] AND #Timer.tMotorTimeout[#VARs.BitIndex].Q THEN
-	           #VARs.Fault_Exit := true;
-	           #TransferActive[#VARs.BitIndex] := FALSE;
-	       END_IF;
-	   
-	        // While active, run both N and N+1
-	       IF #TransferActive[#VARs.BitIndex] THEN
-	           #ControlWord := #ControlWord OR SHL(IN := DWORD#1, N := INT_TO_UINT(#VARs.BitIndex));
-	           #ControlWord := #ControlWord OR SHL(IN := DWORD#1, N := INT_TO_UINT(#VARs.BitIndex + 1));
-	       END_IF;
-	      
+	        IF #TransferActive[#VARs.BitIndex] AND #Timer.tMotorTimeout[#VARs.BitIndex].Q THEN
+	            #VARs.Fault_Exit := TRUE;
+	            #TransferActive[#VARs.BitIndex] := FALSE;
+	        END_IF;
 	    END_FOR;
 	    
-	    #ControlWord := #ControlWord AND #VARs.ValidMask;
+	    // --------------------------------------------------
+	    // (4) Start new transfers from back to front
+	    //     and block adjacent overlap
+	    // --------------------------------------------------
+	    FOR #VARs.BitIndex := #VARs.NumberModules - 2 TO 0 BY -1 DO
+	        #VARs.ReqBit := (#TransferReq AND SHL(IN := DWORD#1, N := INT_TO_UINT(#VARs.BitIndex))) <> DWORD#0;
+	        
+	        #VARs.PrevActive := FALSE;
+	        #VARs.NextActive := FALSE;
+	        
+	        IF #VARs.BitIndex > 0 THEN
+	            #VARs.PrevActive := #TransferActive[#VARs.BitIndex - 1];
+	        END_IF;
+	        
+	        IF #VARs.BitIndex < (#VARs.NumberModules - 2) THEN
+	            #VARs.NextActive := #TransferActive[#VARs.BitIndex + 1];
+	        END_IF;
+	        
+	        IF #VARs.ReqBit
+	            AND NOT #TransferActive[#VARs.BitIndex]
+	            AND NOT #VARs.PrevActive
+	            AND NOT #VARs.NextActive THEN
+	            #TransferActive[#VARs.BitIndex] := TRUE;
+	        END_IF;
+	    END_FOR;
 	    
+	    // --------------------------------------------------
+	    // (5) Build ControlWord from active transfers
+	    // --------------------------------------------------
+	    FOR #VARs.BitIndex := 0 TO #VARs.NumberModules - 2 DO
+	        IF #TransferActive[#VARs.BitIndex] THEN
+	            #ControlWord := #ControlWord OR SHL(IN := DWORD#1, N := INT_TO_UINT(#VARs.BitIndex));
+	            #ControlWord := #ControlWord OR SHL(IN := DWORD#1, N := INT_TO_UINT(#VARs.BitIndex + 1));
+	        END_IF;
+	    END_FOR;
+	    
+	    // --------------------------------------------------
+	    // (6) Export boundary active status
+	    // --------------------------------------------------
+	    #Busy.SrcModule := FALSE;
+	    #Busy.DstModule := FALSE;
+	    
+	    IF #VARs.NumberModules >= 2 THEN
+	        #Busy.SrcModule := #TransferActive[0];
+	        #Busy.DstModule := #TransferActive[#VARs.NumberModules - 2];
+	    END_IF;
+	    
+	    #ControlWord := #ControlWord AND #VARs.ValidMask;
 	END_REGION
 	    
 	// =============================================================================
@@ -221,7 +255,7 @@ BEGIN
 	        
 	        IF (#ControlWord AND SHL(IN := DWORD#1, N := INT_TO_UINT(#VARs.BitIndex))) <> DWORD#0 THEN
 	            #VARs.dbAny.%DBX12.0 := TRUE;
-	            #VARs.dbAny.DBW14 := #CFG.CommandList[#VARs.BitIndex];
+	            #VARs.dbAny.DBW14 := #CFG.CommandList[#VARs.BitIndex].CHARGE;
 	        ELSE
 	            #VARs.dbAny.%DBX12.0 := FALSE;
 	            #VARs.dbAny.DBW14 := WORD#16#0000;

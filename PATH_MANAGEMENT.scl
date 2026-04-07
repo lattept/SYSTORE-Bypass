@@ -33,79 +33,97 @@ BEGIN
 	
 	
 	REGION PATH CFG
+	    //  --------------------------------------------------
 	    // PATH configuration for E0001 -> E0003
+	    //  --------------------------------------------------
 	    "PATH_E0001->E0003_DB".CFG.NumberModules := 3;
-	    "PATH_E0001->E0003_DB".CFG.HskDestEna := true;
+	    "PATH_E0001->E0003_DB".CFG.HskDstEna := true;
 	    
 	    "PATH_E0001->E0003_DB".CFG.ModuleList[0] := INT_TO_UINT("DB_MODULE_E0001".CFG.Module_DB);
-	    "PATH_E0001->E0003_DB".CFG.CommandList[0] := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
+	    "PATH_E0001->E0003_DB".CFG.CommandList[0].CHARGE := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
 	    
 	    "PATH_E0001->E0003_DB".CFG.ModuleList[1] := INT_TO_UINT("DB_MODULE_E0002".CFG.Module_DB);
-	    "PATH_E0001->E0003_DB".CFG.CommandList[1] := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
+	    "PATH_E0001->E0003_DB".CFG.CommandList[1].CHARGE := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
 	    
 	    "PATH_E0001->E0003_DB".CFG.ModuleList[2] := INT_TO_UINT("DB_MODULE_E0003".CFG.Module_DB);
-	    "PATH_E0001->E0003_DB".CFG.CommandList[2] := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
+	    "PATH_E0001->E0003_DB".CFG.CommandList[2].CHARGE := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
 	    
-	    
+	    //  --------------------------------------------------
 	    // PATH configuration for E0004 -> E0003
+	    //  --------------------------------------------------
 	    "PATH_E0004->E0003_DB".CFG.NumberModules := 2;
-	    "PATH_E0004->E0003_DB".CFG.HskDestEna := true;
+	    "PATH_E0004->E0003_DB".CFG.HskDstEna := true;
 	    
 	    "PATH_E0004->E0003_DB".CFG.ModuleList[0] := INT_TO_UINT("DB_MODULE_E0004".CFG.Module_DB);
-	    "PATH_E0004->E0003_DB".CFG.CommandList[0] := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
+	    "PATH_E0004->E0003_DB".CFG.CommandList[0].CHARGE := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
 	    
 	    "PATH_E0004->E0003_DB".CFG.ModuleList[1] := INT_TO_UINT("DB_MODULE_E0003".CFG.Module_DB);
-	    "PATH_E0004->E0003_DB".CFG.CommandList[1] := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
+	    "PATH_E0004->E0003_DB".CFG.CommandList[1].CHARGE := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
 	    
+	    //  --------------------------------------------------
 	    // PATH configuration for E0003 -> E0006
+	    //  --------------------------------------------------
 	    "PATH_E0003->E0006_DB".CFG.NumberModules := 3;
+	    "PATH_E0003->E0006_DB".CFG.HskDstEna := true;
 	    "PATH_E0003->E0006_DB".CFG.ModuleList[0] := INT_TO_UINT("DB_MODULE_E0003".CFG.Module_DB);
-	    "PATH_E0003->E0006_DB".CFG.CommandList[0] := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
+	    "PATH_E0003->E0006_DB".CFG.CommandList[0].CHARGE := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
 	    
 	    "PATH_E0003->E0006_DB".CFG.ModuleList[1] := INT_TO_UINT("DB_MODULE_E0005".CFG.Module_DB);
-	    "PATH_E0003->E0006_DB".CFG.CommandList[1] := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
+	    "PATH_E0003->E0006_DB".CFG.CommandList[1].CHARGE := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
 	    
 	    "PATH_E0003->E0006_DB".CFG.ModuleList[2] := INT_TO_UINT("DB_MODULE_E0006".CFG.Module_DB);
-	    "PATH_E0003->E0006_DB".CFG.CommandList[2] := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
+	    "PATH_E0003->E0006_DB".CFG.CommandList[2].CHARGE := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
 	    
+	    //  --------------------------------------------------
 	    // PATH configuration for E0006 - >E0008
+	    //  --------------------------------------------------
 	    "PATH_E0006->E0008_DB".CFG.NumberModules := 2;
 	    "PATH_E0006->E0008_DB".CFG.T_MotorTimeout := T#30s;
 	    "PATH_E0006->E0008_DB".CFG.HskSrcEna := true;
 	    
 	    "PATH_E0006->E0008_DB".CFG.ModuleList[0] := INT_TO_UINT("DB_MODULE_E0006".CFG.Module_DB);
-	    "PATH_E0006->E0008_DB".CFG.CommandList[0] := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
+	    "PATH_E0006->E0008_DB".CFG.CommandList[0].CHARGE := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
 	    
 	    "PATH_E0006->E0008_DB".CFG.ModuleList[1] := INT_TO_UINT("DB_MODULE_E0008".CFG.Module_DB);
-	    "PATH_E0006->E0008_DB".CFG.CommandList[1] := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
+	    "PATH_E0006->E0008_DB".CFG.CommandList[1].CHARGE := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
 	    
+	    //  --------------------------------------------------
 	    // PATH configuration for E0007 - >E0008
+	    //  --------------------------------------------------
 	    "PATH_E0006->E0007_DB".CFG.NumberModules := 2;
 	    "PATH_E0006->E0007_DB".CFG.T_MotorTimeout := T#30s;
 	    "PATH_E0006->E0007_DB".CFG.HskSrcEna := true;
 	    
 	    "PATH_E0006->E0007_DB".CFG.ModuleList[0] := INT_TO_UINT("DB_MODULE_E0006".CFG.Module_DB);
-	    "PATH_E0006->E0007_DB".CFG.CommandList[0] := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
+	    "PATH_E0006->E0007_DB".CFG.CommandList[0].CHARGE := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
 	    
 	    "PATH_E0006->E0007_DB".CFG.ModuleList[1] := INT_TO_UINT("DB_MODULE_E0007".CFG.Module_DB);
-	    "PATH_E0006->E0007_DB".CFG.CommandList[1] := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
+	    "PATH_E0006->E0007_DB".CFG.CommandList[1].CHARGE := "DEFINE".COMMANDs.SWITCH_PANEL.MODULEs.CHAIN_ROLLER.FORWARD;
 	END_REGION
 	
 	REGION MERGE CFG
+	    //  --------------------------------------------------
 	    // PATH merge E0003
+	    //  --------------------------------------------------
 	    "PATH_MERGE_E0003_DB".CFG.NumberOfPaths := 2;
 	    "PATH_MERGE_E0003_DB".CFG.DstReady := NOT "DB_MODULE_E0003".STS_MODULE.Presence;
 	    "PATH_MERGE_E0003_DB".CFG.Req[0] := "PATH_E0001->E0003_DB".Hsk.Req_DstMov;
 	    "PATH_MERGE_E0003_DB".CFG.Req[1] := "PATH_E0004->E0003_DB".Hsk.Req_DstMov;
 	    "PATH_MERGE_E0003_DB".CFG.Done[0] := "PATH_E0001->E0003_DB".Hsk.Done_DstMov;
 	    "PATH_MERGE_E0003_DB".CFG.Done[1] := "PATH_E0004->E0003_DB".Hsk.Done_DstMov;
-	    "PATH_E0001->E0003_DB".Hsk.Grant_DstMov := "PATH_MERGE_E0003_DB".Grant[0];
-	    "PATH_E0004->E0003_DB".Hsk.Grant_DstMov := "PATH_MERGE_E0003_DB".Grant[1];
+	    "PATH_E0001->E0003_DB".Hsk.Grant_DstMov := "PATH_MERGE_E0003_DB".Grant[0] AND NOT "PATH_E0003->E0006_DB".Busy.SrcModule;
+	    "PATH_E0004->E0003_DB".Hsk.Grant_DstMov := "PATH_MERGE_E0003_DB".Grant[1] AND NOT "PATH_E0003->E0006_DB".Busy.SrcModule;
 	    
 	END_REGION
 	
+	REGION HOLD MODULE
+	    "PATH_E0003->E0006_DB".Hsk.Grant_DstMov := NOT ("PATH_E0006->E0007_DB".Busy.SrcModule OR "PATH_E0006->E0008_DB".Busy.SrcModule);
+	END_REGION
+	
 	REGION SPLIT CFG
+	    //  --------------------------------------------------
 	    // PATH SPLIT E0006
+	    //  --------------------------------------------------
 	    "PATH_SPLIT_E0006_DB".CFG.NumberOfPaths := 2;
 	    "PATH_SPLIT_E0006_DB".CFG.Req[0] := "PATH_E0006->E0008_DB".Hsk.Req_SrcMov;
 	    "PATH_SPLIT_E0006_DB".CFG.Req[1] := "PATH_E0006->E0007_DB".Hsk.Req_SrcMov;
